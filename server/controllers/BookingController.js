@@ -1,20 +1,12 @@
 import Show from "../models/Show.js";
 import Booking from "../models/Booking.js";
 import Stripe from "stripe";
+import { inngest } from "../inngest/index.js";
 // Function to check availability of selected seats
 const checkSeatsAvailability = async (showId, selectedSeats) => {
-  const showData = await Show.findById(showId);
-
-  if (!showData) {
-    return false;
-  }
-
-  const occupiedSeats = showData.occupiedSeats || {};
-
-  const isAnySeatTaken = selectedSeats.some(
-    (seat) => occupiedSeats[seat]
-  );
-
+  const bookings = await Booking.find({ show: showId });
+  const occupiedSeats = bookings.flatMap((b) => b.bookedSeats);
+  const isAnySeatTaken = selectedSeats.some((seat) => occupiedSeats.includes(seat));
   return !isAnySeatTaken;
 };
 
@@ -52,14 +44,6 @@ export const createBooking = async (req, res) => {
       bookedSeats: selectedSeats,
     });
 
-    // Mark seats as occupied
-    selectedSeats.map((seat) => {
-      showData.occupiedSeats[seat] = userId;
-    });
-
-    showData.markModified("occupiedSeats");
-
-    await showData.save();
     const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
     const line_items = [
       {
@@ -74,7 +58,7 @@ export const createBooking = async (req, res) => {
       },
     ];
     const session = await stripeInstance.checkout.sessions.create({
-      success_url: `${origin}/my-bookings`,
+      success_url: `${origin}/my-bookings?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/my-bookings`,
       line_items: line_items,
       mode: "payment",
@@ -85,7 +69,12 @@ export const createBooking = async (req, res) => {
     })
     booking.paymentLink = session.url;
     await booking.save();
-
+    await inngest.send({
+      name: "app/checkpayment",
+      data: {
+        bookingId: booking._id.toString(),
+      },
+    })
     res.json({
       success: true,
       url: session.url,
@@ -108,7 +97,8 @@ export const getOccupiedSeats = async (req, res) => {
       });
     }
 
-    const occupiedSeats = Object.keys(showData.occupiedSeats || {});
+    const bookings = await Booking.find({ show: showId });
+    const occupiedSeats = bookings.flatMap((b) => b.bookedSeats);
 
     res.json({
       success: true,
@@ -135,6 +125,31 @@ export const getUserBookings = async (req, res) => {
       .sort({ createdAt: -1 });
 
     res.json({ success: true, bookings });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+export const verifyPayment = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status === "paid") {
+      const { bookingId } = session.metadata;
+
+      if (bookingId) {
+        await Booking.findByIdAndUpdate(bookingId, {
+          isPaid: true,
+          paymentLink: "",
+        });
+        return res.json({ success: true, message: "Payment verified" });
+      }
+    }
+
+    res.json({ success: false, message: "Payment not verified" });
+
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });

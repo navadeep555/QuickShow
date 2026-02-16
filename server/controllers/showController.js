@@ -84,7 +84,6 @@ export const addShow = async (req, res) => {
           movie: movie._id,
           showDateTime: new Date(`${show.date}T${time}`),
           showPrice,
-          occupiedSeats: {},
         });
       });
     });

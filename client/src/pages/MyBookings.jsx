@@ -5,36 +5,58 @@ import Loading from "../components/Loading";
 import { dateFormat } from "../lib/dateFormat";
 import { useContext } from "react";
 import { AppContext } from "../context/AppContext";
+import { Link, useLocation } from "react-router-dom";
 
 const MyBookings = () => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const sessionId = queryParams.get("session_id");
   const currency = import.meta.env.VITE_CURRENCY;
   const { axios, getToken, user, image_base_url } = useContext(AppContext);
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const getMyBookings = async () => {
-   try{
-    const {data} = await axios.get("/api/bookings/my-bookings", {
-      headers: {
-        Authorization: `Bearer ${await getToken()}`
-      }
-    });
+    try {
+      const { data } = await axios.get("/api/bookings/my-bookings", {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`
+        }
+      });
 
-    if(data.success){
-      setBookings(data.bookings);
+      if (data.success) {
+        setBookings(data.bookings);
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsLoading(false);
     }
-   }catch(error){
-    console.log(error);
-   }finally{
-    setIsLoading(false);
+  };
+
+  const verifyPaymentStatus = async () => {
+    try {
+      await axios.post("/api/bookings/verify", { sessionId }, {
+        headers: {
+          Authorization: `Bearer ${await getToken()}`
+        }
+      });
+    } catch (error) {
+      console.log(error);
+    } finally {
+      getMyBookings();
     }
   };
 
   useEffect(() => {
-    if(user){
-      getMyBookings();
+    if (user) {
+      if (sessionId) {
+        verifyPaymentStatus();
+      } else {
+        getMyBookings();
+      }
     }
-  }, [user]);
+  }, [user, sessionId]);
 
   return !isLoading ? (
     <div className="relative px-6 md:px-16 lg:px-40 pt-30 md:pt-40 min-h-[80vh]">
@@ -84,14 +106,18 @@ const MyBookings = () => {
                 {currency}{item.amount}
               </p>
 
-              {!item.isPaid && (
-                <button
+              {!item.isPaid ? (
+                <Link to={item.paymentLink}
                   className="bg-primary px-4 py-1.5 mb-3
                              text-sm rounded-full font-medium
-                             cursor-pointer"
-                >
+                             cursor-pointer">
                   Pay Now
-                </button>
+                </Link>
+              ) : (
+                <p className="bg-green-500/10 text-green-500 border border-green-500/20 
+                             px-4 py-1 mb-3 text-xs rounded-full font-semibold uppercase tracking-wider">
+                  Paid
+                </p>
               )}
             </div>
 
