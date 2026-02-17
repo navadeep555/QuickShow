@@ -128,6 +128,10 @@ export const AppProvider = ({ children }) => {
     if (user) {
       fetchIsAdmin();
       fetchFavoriteMovies();
+    } else {
+      // 🔥 FIX: Set adminLoading to false when there's no user
+      setAdminLoading(false);
+      setIsAdmin(false);
     }
   }, [user]);
 
