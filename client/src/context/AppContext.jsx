@@ -28,12 +28,18 @@ export const AppProvider = ({ children }) => {
     try {
       const token = await getToken();
 
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const { data } = await axios.get("/api/admin/is-admin", {
         headers: {
           Authorization: `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       setIsAdmin(data.isAdmin);
 
       if (!data.isAdmin && location.pathname.startsWith("/admin")) {
@@ -42,7 +48,15 @@ export const AppProvider = ({ children }) => {
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Admin check error:", error);
+      // If error is 401/403, user is not admin
+      // If error is network/timeout, assume not admin for safety
+      setIsAdmin(false);
+
+      if (error.code === 'ECONNABORTED' || error.name === 'AbortError') {
+        console.error("Backend connection timeout - check VITE_BASE_URL");
+        toast.error("Unable to connect to server. Please try again later.");
+      }
     } finally {
       setAdminLoading(false);
     }
@@ -53,7 +67,15 @@ export const AppProvider = ({ children }) => {
   // ===============================
   const fetchShows = async () => {
     try {
-      const { data } = await axios.get("/api/shows/all"); // ✅ FIXED
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const { data } = await axios.get("/api/shows/all", {
+        signal: controller.signal
+      }); // ✅ FIXED
+
+      clearTimeout(timeoutId);
 
       if (data.success) {
         setShows(data.shows);
@@ -62,7 +84,12 @@ export const AppProvider = ({ children }) => {
       }
 
     } catch (error) {
-      console.error(error);
+      console.error("Fetch shows error:", error);
+
+      if (error.code === 'ECONNABORTED' || error.name === 'AbortError') {
+        console.error("Backend connection timeout - check VITE_BASE_URL");
+        toast.error("Unable to load shows. Please check your connection.");
+      }
     }
   };
 
