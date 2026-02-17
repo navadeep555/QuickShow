@@ -25,8 +25,13 @@ const App = () => {
 
   const { user, isAdmin, adminLoading } = useAppContext()
 
-  // 🔥 Show toast only AFTER loading finishes
+  // 🔥 Show toast only AFTER loading finishes and we are sure user is NOT admin
   useEffect(() => {
+    // Only show error if:
+    // 1. Admin loading is finished
+    // 2. User is logged in
+    // 3. User is explicitly NOT an admin
+    // 4. User is trying to access an admin route
     if (!adminLoading && user && isAdmin === false && isAdminRoute) {
       toast.error("You are not authorized to access admin dashboard")
     }

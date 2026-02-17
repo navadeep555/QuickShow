@@ -15,15 +15,12 @@ export const protectAdmin = async (req, res, next) => {
 
     const user = await clerkClient.users.getUser(userId);
 
-    console.log("-----------------------------------------");
-    console.log("ADMIN CHECK FOR USER:", userId);
-    console.log("EMAILS:", user.emailAddresses.map(e => e.emailAddress));
-    console.log("PUBLIC METADATA:", user.publicMetadata);
-    console.log("PRIVATE METADATA:", user.privateMetadata);
-    console.log("-----------------------------------------");
 
-    // Check both publicMetadata and privateMetadata for role
-    const role = user.publicMetadata?.role || user.privateMetadata?.role;
+
+    // Check publicMetadata, privateMetadata, and unsafeMetadata for role
+    const role = user.publicMetadata?.role ||
+      user.privateMetadata?.role ||
+      user.unsafeMetadata?.role;
 
     // Check if user has the admin email (fallback)
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -40,7 +37,7 @@ export const protectAdmin = async (req, res, next) => {
       });
     }
 
-    console.log("ADMIN VERIFIED ✅");
+
     next();
   } catch (error) {
     console.log("ERROR:", error);

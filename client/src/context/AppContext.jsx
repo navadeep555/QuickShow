@@ -16,7 +16,7 @@ export const AppProvider = ({ children }) => {
   const [favoriteMovies, setFavoriteMovies] = useState([]);
   const image_base_url = import.meta.env.VITE_TMDB_IMAGE_BASE_URL;
 
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const { getToken } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -42,11 +42,6 @@ export const AppProvider = ({ children }) => {
       clearTimeout(timeoutId);
       setIsAdmin(data.isAdmin);
 
-      if (!data.isAdmin && location.pathname.startsWith("/admin")) {
-        navigate("/");
-        toast.error("You are not authorized to access admin dashboard");
-      }
-
     } catch (error) {
       console.error("Admin check error:", error);
       // If error is 401/403, user is not admin
@@ -63,7 +58,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // ===============================
-  // Fetch Shows  ✅ FIXED ROUTE
+  // Fetch Shows
   // ===============================
   const fetchShows = async () => {
     try {
@@ -73,7 +68,7 @@ export const AppProvider = ({ children }) => {
 
       const { data } = await axios.get("/api/shows/all", {
         signal: controller.signal
-      }); // ✅ FIXED
+      });
 
       clearTimeout(timeoutId);
 
@@ -94,7 +89,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // ===============================
-  // Fetch Favorite Movies  ❗ REMOVE if route not created
+  // Fetch Favorite Movies
   // ===============================
   const fetchFavoriteMovies = async () => {
     try {
@@ -125,7 +120,11 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    // 🔥 FIX: Wait for Clerk to load completely before checking admin status
+    if (!isLoaded) return;
+
     if (user) {
+      setAdminLoading(true); // 🔥 Fix: Set loading to true while checking
       fetchIsAdmin();
       fetchFavoriteMovies();
     } else {
@@ -133,7 +132,7 @@ export const AppProvider = ({ children }) => {
       setAdminLoading(false);
       setIsAdmin(false);
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
   const value = {
     axios,
@@ -142,6 +141,7 @@ export const AppProvider = ({ children }) => {
     getToken,
     navigate,
     isAdmin,
+    setIsAdmin,
     shows,
     favoriteMovies,
     fetchFavoriteMovies,
