@@ -77,7 +77,8 @@ const AddShows = () => {
       }
     } catch (error) {
       console.error("Error adding show:", error);
-      toast.error("Failed to add show");
+      console.log("Error Data:", error.response?.data);
+      toast.error(error.response?.data?.message || "Failed to add show");
     } finally {
       setAddingShow(false);
     }

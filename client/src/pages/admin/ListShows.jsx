@@ -19,20 +19,21 @@ const ListShows = () => {
           Authorization: `Bearer ${await getToken()}`
         }
       });
-      if( data.success ) {
+      if (data.success) {
         setShows(data.shows);
-        setLoading(false);
       }
-      else{
+      else {
         console.error("Failed to fetch shows:", data.error);
       }
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if(user){
+    if (user) {
       getAllShows();
     }
   }, [user]);
@@ -67,12 +68,12 @@ const ListShows = () => {
                 </td>
 
                 <td className="p-2">
-                  {Object.keys(show.occupiedSeats).length}
+                  {show.occupiedSeats?.length || 0}
                 </td>
 
                 <td className="p-2">
                   {currency}{" "}
-                  {Object.keys(show.occupiedSeats).length *
+                  {(show.occupiedSeats?.length || 0) *
                     show.showPrice}
                 </td>
               </tr>

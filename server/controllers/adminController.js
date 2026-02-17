@@ -42,13 +42,22 @@ export const getDashboardData = async (req, res) => {
 // API to get all shows
 export const getAllShows = async (req, res) => {
   try {
+    console.log("Admin getAllShows HIT");
     const shows = await Show.find({
       showDateTime: { $gte: new Date() },
     })
       .populate("movie")
       .sort({ showDateTime: 1 });
 
-    res.json({ success: true, shows });
+    const showsWithSeats = await Promise.all(
+      shows.map(async (show) => {
+        const bookings = await Booking.find({ show: show._id });
+        const occupiedSeats = bookings.flatMap((booking) => booking.bookedSeats);
+        return { ...show.toObject(), occupiedSeats };
+      })
+    );
+
+    res.json({ success: true, shows: showsWithSeats });
 
   } catch (error) {
     console.error(error);

@@ -1,6 +1,7 @@
 import axios from "axios";
 import Movie from "../models/Movie.js";
 import Show from "../models/Show.js";
+import { inngest } from "../inngest/index.js";
 
 // 🎬 Get Now Playing Movies
 export const getNowPlayingMovies = async (req, res) => {
@@ -30,6 +31,8 @@ export const addShow = async (req, res) => {
   try {
     const { movieID, showInput, showPrice } = req.body;
 
+    console.log("ADD SHOW REQ BODY:", JSON.stringify(req.body, null, 2));
+
     if (!movieID || !showInput || !showPrice) {
       return res.status(400).json({
         success: false,
@@ -41,20 +44,22 @@ export const addShow = async (req, res) => {
 
     // 🔹 Fetch movie from TMDB if not exists
     if (!movie) {
-      const [detailsRes, creditsRes] = await Promise.all([
-        axios.get(`https://api.themoviedb.org/3/movie/${movieID}`, {
-          headers: {
-            Authorization: `Bearer ${process.env.TMDB_TOKEN}`,
-            Accept: "application/json",
-          },
-        }),
-        axios.get(`https://api.themoviedb.org/3/movie/${movieID}/credits`, {
-          headers: {
-            Authorization: `Bearer ${process.env.TMDB_TOKEN}`,
-            Accept: "application/json",
-          },
-        }),
-      ]);
+      console.log(`Fetching details for movie ID: ${movieID}`);
+      const detailsRes = await axios.get(`https://api.themoviedb.org/3/movie/${movieID}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.TMDB_TOKEN}`,
+          Accept: "application/json",
+        },
+      });
+      console.log("Details fetched");
+
+      const creditsRes = await axios.get(`https://api.themoviedb.org/3/movie/${movieID}/credits`, {
+        headers: {
+          Authorization: `Bearer ${process.env.TMDB_TOKEN}`,
+          Accept: "application/json",
+        },
+      });
+      console.log("Credits fetched");
 
       const details = detailsRes.data;
       const credits = creditsRes.data;
