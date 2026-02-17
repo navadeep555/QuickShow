@@ -27,15 +27,43 @@ export const stripeWebhooks = async (request, response) => {
         console.log("Booking ID from metadata:", bookingId);
 
         if (bookingId) {
-          const updatedBooking = await Booking.findByIdAndUpdate(bookingId, {
-            isPaid: true,
-            paymentLink: "",
-          });
-          await inngest.send({
-            name: "app/show.booked",
-            data: { bookingId },
-          });
-          console.log("Updated Booking Status for:", bookingId, "New isPaid:", updatedBooking?.isPaid);
+          const booking = await Booking.findById(bookingId).populate({
+            path: 'show',
+            model: 'Show',
+            populate: { path: 'movie', model: 'Movie' }
+          }).populate({ path: 'user', model: 'User' });
+
+          if (booking && !booking.isPaid) {
+            await Booking.findByIdAndUpdate(bookingId, {
+              isPaid: true,
+              paymentLink: "",
+            });
+
+            const movieTitle = booking.show?.movie?.title;
+            const showDate = booking.show?.showDateTime ? new Date(booking.show.showDateTime).toLocaleDateString() : "";
+            const showTime = booking.show?.showDateTime ? new Date(booking.show.showDateTime).toLocaleTimeString() : "";
+            const userName = booking.user?.name;
+            const userEmail = booking.user?.email;
+
+            console.log(`Payment via Webhook Verified. Sending event: app/show.booked for Booking: ${bookingId}`, {
+              movieTitle, showDate, showTime, userName, userEmail
+            });
+
+            await inngest.send({
+              name: "app/show.booked",
+              data: {
+                bookingId,
+                movieTitle,
+                showDate,
+                showTime,
+                userName,
+                userEmail
+              },
+            });
+            console.log("Updated Booking Status for:", bookingId, "via Webhook");
+          } else {
+            console.log("Booking already marked as paid:", bookingId);
+          }
         }
 
         break;

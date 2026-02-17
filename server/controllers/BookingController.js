@@ -2,6 +2,7 @@ import Show from "../models/Show.js";
 import Booking from "../models/Booking.js";
 import Stripe from "stripe";
 import { inngest } from "../inngest/index.js";
+import { getAuth } from "@clerk/express";
 // Function to check availability of selected seats
 const checkSeatsAvailability = async (showId, selectedSeats) => {
   const bookings = await Booking.find({ show: showId });
@@ -12,9 +13,9 @@ const checkSeatsAvailability = async (showId, selectedSeats) => {
 
 export const createBooking = async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = getAuth(req);
     const { showId, seats: selectedSeats } = req.body;
-    const origin = req.headers.origin;
+    const origin = req.headers.origin || "http://localhost:5173";
 
     if (!userId) {
       return res.status(401).json({
@@ -35,6 +36,13 @@ export const createBooking = async (req, res) => {
 
     // Get show details
     const showData = await Show.findById(showId).populate("movie");
+
+    if (!showData) {
+      return res.status(404).json({
+        success: false,
+        message: "Show not found",
+      });
+    }
 
     // Create booking
     const booking = await Booking.create({
@@ -113,7 +121,7 @@ export const getOccupiedSeats = async (req, res) => {
 
 export const getUserBookings = async (req, res) => {
   try {
-    const { userId } = req.auth;
+    const { userId } = getAuth(req);
 
     const bookings = await Booking.find({ user: userId })
       .populate({
@@ -140,10 +148,39 @@ export const verifyPayment = async (req, res) => {
       const { bookingId } = session.metadata;
 
       if (bookingId) {
-        await Booking.findByIdAndUpdate(bookingId, {
-          isPaid: true,
-          paymentLink: "",
-        });
+        const booking = await Booking.findById(bookingId).populate({
+          path: 'show',
+          populate: { path: 'movie' }
+        }).populate({ path: 'user' });
+
+        if (booking && !booking.isPaid) {
+          await Booking.findByIdAndUpdate(bookingId, {
+            isPaid: true,
+            paymentLink: "",
+          });
+
+          const movieTitle = booking.show?.movie?.title;
+          const showDate = booking.show?.showDateTime ? new Date(booking.show.showDateTime).toLocaleDateString() : "";
+          const showTime = booking.show?.showDateTime ? new Date(booking.show.showDateTime).toLocaleTimeString() : "";
+          const userName = booking.user?.name;
+          const userEmail = booking.user?.email;
+
+          console.log(`Payment Verified. Sending event: app/show.booked for Booking: ${bookingId}`, {
+            movieTitle, showDate, showTime, userName, userEmail
+          });
+
+          await inngest.send({
+            name: "app/show.booked",
+            data: {
+              bookingId,
+              movieTitle,
+              showDate,
+              showTime,
+              userName,
+              userEmail
+            },
+          });
+        }
         return res.json({ success: true, message: "Payment verified" });
       }
     }
