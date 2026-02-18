@@ -9,6 +9,8 @@ const AddShows = () => {
   const { axios, getToken, user, image_base_url } = useAppContext();
   const currency = import.meta.env.VITE_CURRENCY;
   const [industries, setIndustries] = useState([]);
+  const [theatres, setTheatres] = useState([]);
+  const [selectedTheatre, setSelectedTheatre] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [showPrice, setShowPrice] = useState("");
@@ -21,14 +23,18 @@ const AddShows = () => {
     try {
       setLoading(true);
 
-      const { data } = await axios.get("/api/shows/now-playing", {
-        headers: {
-          Authorization: `Bearer ${await getToken()}`
-        }
-      });
+      const [moviesResult, theatresResult] = await Promise.allSettled([
+        axios.get("/api/shows/now-playing", {
+          headers: { Authorization: `Bearer ${await getToken()}` }
+        }),
+        axios.get("/api/theatres/all"),
+      ]);
 
-      if (data.success) {
-        setIndustries(data.industries);
+      if (moviesResult.status === "fulfilled" && moviesResult.value.data.success) {
+        setIndustries(moviesResult.value.data.industries);
+      }
+      if (theatresResult.status === "fulfilled" && theatresResult.value.data.success) {
+        setTheatres(theatresResult.value.data.theatres);
       }
 
     } catch (error) {
@@ -41,8 +47,8 @@ const AddShows = () => {
     try {
       setAddingShow(true);
 
-      if (!selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0) {
-        toast("Please fill all fields");
+      if (!selectedTheatre || !selectedMovie || !showPrice || Object.keys(dateTimeSelection).length === 0) {
+        toast("Please fill all fields including theatre");
         setAddingShow(false);
         return;
       }
@@ -55,6 +61,7 @@ const AddShows = () => {
         movieID: selectedMovie,
         showInput,
         showPrice: Number(showPrice),
+        theatreId: selectedTheatre,
       };
 
       const { data } = await axios.post(
@@ -72,6 +79,7 @@ const AddShows = () => {
         setSelectedMovie(null);
         setDateTimeSelection({});
         setShowPrice("");
+        setSelectedTheatre("");
       } else {
         toast.error(data.message);
       }
@@ -136,6 +144,30 @@ const AddShows = () => {
   return (
     <>
       <Title text1="Add" text2="Shows" />
+
+      {/* ===== THEATRE SELECTOR ===== */}
+      <div className="mt-10">
+        <p className="text-lg font-medium mb-3">Select Theatre</p>
+        {theatres.length === 0 ? (
+          <p className="text-gray-400 text-sm">No theatres available. Please add a theatre first.</p>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {theatres.map((theatre) => (
+              <button
+                key={theatre._id}
+                onClick={() => setSelectedTheatre(theatre._id)}
+                className={`px-4 py-2 rounded-lg border text-sm transition ${selectedTheatre === theatre._id
+                  ? "border-primary bg-primary/20 text-primary"
+                  : "border-gray-600 hover:border-primary/60"
+                  }`}
+              >
+                <span className="font-medium">{theatre.name}</span>
+                <span className="text-gray-400 ml-1">— {theatre.city}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <p className="mt-10 text-lg font-medium">Now Playing Movies</p>
 

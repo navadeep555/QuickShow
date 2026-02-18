@@ -7,6 +7,8 @@ import MovieDetails from './pages/MovieDetails'
 import SeatLayout from './pages/SeatLayout'
 import MyBookings from './pages/MyBookings'
 import Favorite from './pages/Favorite'
+import Theatres from './pages/Theatres'
+import Releases from './pages/Releases'
 import { Toaster } from 'react-hot-toast'
 import { toast } from 'react-hot-toast'
 import Layout from './pages/admin/Layout'
@@ -14,16 +16,19 @@ import Dashboard from './pages/admin/Dashboard'
 import AddShows from './pages/admin/AddShows'
 import ListShows from './pages/admin/ListShows'
 import ListBookngs from './pages/admin/ListBookngs'
+import AddTheatre from './pages/admin/AddTheatre'
+import ListTheatres from './pages/admin/ListTheatres'
 import { SignIn } from '@clerk/clerk-react'
 import { useAppContext } from "./context/AppContext";
 import { useEffect } from "react";
+import CitySelector from './components/CitySelector'
 
 const App = () => {
 
   const location = useLocation()
   const isAdminRoute = location.pathname.startsWith('/admin')
 
-  const { user, isAdmin, adminLoading } = useAppContext()
+  const { user, isAdmin, adminLoading, showCitySelector } = useAppContext()
 
   // 🔥 Show toast only AFTER loading finishes and we are sure user is NOT admin
   useEffect(() => {
@@ -76,6 +81,8 @@ const App = () => {
         }}
       />
 
+      {showCitySelector && <CitySelector />}
+
       {!isAdminRoute && <Navbar />}
 
       <Routes>
@@ -86,6 +93,8 @@ const App = () => {
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/loading/:nexturl" element={<MyBookings />} />
         <Route path="/favorite" element={<Favorite />} />
+        <Route path="/theatres" element={<Theatres />} />
+        <Route path="/releases" element={<Releases />} />
 
         <Route
           path="/admin/*"
@@ -107,6 +116,8 @@ const App = () => {
           <Route path="add-shows" element={<AddShows />} />
           <Route path="list-shows" element={<ListShows />} />
           <Route path="list-bookings" element={<ListBookngs />} />
+          <Route path="add-theatre" element={<AddTheatre />} />
+          <Route path="list-theatres" element={<ListTheatres />} />
         </Route>
 
       </Routes>

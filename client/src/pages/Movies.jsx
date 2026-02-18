@@ -5,7 +5,11 @@ import { AppContext } from "../context/AppContext";
 
 const Movies = () => {
 
-  const { shows } = useContext(AppContext)
+  const { shows, selectedCity } = useContext(AppContext)
+
+  const filteredShows = selectedCity
+    ? shows.filter(show => show.theatres && show.theatres.some(t => t.city?.toLowerCase() === selectedCity.toLowerCase()))
+    : shows;
 
   return (
     <div className="relative my-32 px-6 md:px-16 lg:px-40 xl:px-44 overflow-hidden min-h-[80vh]">
@@ -14,7 +18,7 @@ const Movies = () => {
       <BlurCircle top="120px" left="-60px" />
       <BlurCircle bottom="80px" right="-40px" />
 
-      {shows.length > 0 ? (
+      {filteredShows.length > 0 ? (
         <>
           {/* Heading */}
           <h1 className="text-xl md:text-2xl font-semibold text-center text-white mb-10">
@@ -23,7 +27,7 @@ const Movies = () => {
 
           {/* Movies Grid */}
           <div className="flex flex-wrap justify-center gap-8">
-            {shows.map((movie) => (
+            {filteredShows.map((movie) => (
               <MovieCard key={movie._id} movie={movie} />
             ))}
           </div>

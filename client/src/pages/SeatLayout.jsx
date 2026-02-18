@@ -15,6 +15,7 @@ const SeatLayout = () => {
   const [show, setShow] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [theatreInfo, setTheatreInfo] = useState(null);
   const { axios, getToken, user } = useContext(AppContext);
   /* ================= FETCH SHOW ================= */
   const getShow = async () => {
@@ -22,10 +23,25 @@ const SeatLayout = () => {
       const { data } = await axios.get(`/api/shows/${id}`);
 
       if (data.success) {
+        // Find the theatre that has shows on the selected date
+        let matchedTheatre = null;
+        let matchedDateTime = null;
+
+        if (data.theatres) {
+          for (const theatre of data.theatres) {
+            if (theatre.dateTime && theatre.dateTime[date]) {
+              matchedTheatre = theatre;
+              matchedDateTime = theatre.dateTime;
+              break;
+            }
+          }
+        }
+
         setShow({
           movie: data.movie,
-          dateTime: data.dateTime,
+          dateTime: matchedDateTime || {},
         });
+        setTheatreInfo(matchedTheatre);
       } else {
         toast.error(data.message);
         navigate("/movies");
@@ -197,6 +213,15 @@ const SeatLayout = () => {
 
           {/* SCREEN */}
           <div className="w-full max-w-xl mb-6">
+            {/* Theatre Info */}
+            {theatreInfo && (
+              <div className="text-center mb-4">
+                <p className="text-white font-semibold text-base">{theatreInfo.name}</p>
+                <p className="text-gray-400 text-sm flex items-center justify-center gap-1">
+                  <span>📍</span> {theatreInfo.city}
+                </p>
+              </div>
+            )}
             <div className="h-2 bg-primary/50 rounded-full mb-2" />
             <p className="text-center text-gray-400 text-sm">
               SCREEN SIDE

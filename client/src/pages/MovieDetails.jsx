@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useContext } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useContext, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import BlurCircle from "../components/BlurCircle";
-import { StarIcon, PlayCircleIcon, Heart, X, Loader2 } from "lucide-react";
+import { StarIcon, PlayCircleIcon, Heart, X, Loader2, MapPinIcon } from "lucide-react";
 import timeFormat from "../lib/timeFormat";
 import DateSelect from "../components/DateSelect";
 import MovieCard from "../components/MovieCard";
@@ -12,8 +12,12 @@ import { toast } from "react-hot-toast";
 const MovieDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { axios, shows, getToken, user, fetchFavoriteMovies, favoriteMovies, image_base_url } = useContext(AppContext);
+  const location = useLocation();
+  const theatreIdFromUrl = new URLSearchParams(location.search).get("theatreId");
+  const { axios, shows, getToken, user, fetchFavoriteMovies, favoriteMovies, image_base_url, selectedCity, setShowCitySelector } = useContext(AppContext);
   const [show, setShow] = useState(null);
+  const [selectedTheatre, setSelectedTheatre] = useState(null);
+  const dateRef = useRef(null);
 
   // Trailer modal state
   const [showTrailer, setShowTrailer] = useState(false);
@@ -26,10 +30,23 @@ const MovieDetails = () => {
       const { data } = await axios.get(`/api/shows/${id}`);
 
       if (data.success) {
+        const theatreList = data.theatres || [];
         setShow({
           movie: data.movie,
-          dateTime: data.dateTime,
+          theatres: theatreList,
         });
+        // Auto-select theatre from URL param (coming from Theatres page)
+        if (theatreIdFromUrl) {
+          const match = theatreList.find(t => t.theatreId === theatreIdFromUrl);
+          if (match) {
+            setSelectedTheatre(match);
+            return; // skip generic auto-select
+          }
+        }
+        // Auto-select if only one theatre available
+        if (theatreList.length === 1) {
+          setSelectedTheatre(theatreList[0]);
+        }
       } else {
         toast.error(data.message);
         navigate("/movies");
@@ -39,6 +56,11 @@ const MovieDetails = () => {
       toast.error("Failed to fetch show details");
     }
   };
+
+  // Clear selected theatre whenever city changes
+  useEffect(() => {
+    setSelectedTheatre(null);
+  }, [selectedCity]);
 
   const handleWatchTrailer = async () => {
     setLoadingTrailers(true);
@@ -147,7 +169,7 @@ const MovieDetails = () => {
             </button>
 
             <a
-              href="#dateSelect"
+              href="#theatre-select"
               className="px-10 py-3 text-sm bg-primary hover:bg-primary-dull rounded-md transition active:scale-95"
             >
               Buy Tickets
@@ -186,8 +208,77 @@ const MovieDetails = () => {
         </div>
       </div>
 
+      {/* ================= THEATRE SELECTOR ================= */}
+      <div id="theatre-select" className="mt-20">
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-lg font-medium">Select Theatre</p>
+          {selectedCity && (
+            <button
+              onClick={() => setShowCitySelector(true)}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary transition"
+            >
+              <MapPinIcon className="w-3 h-3" />
+              {selectedCity} · Change
+            </button>
+          )}
+        </div>
+
+        {show.theatres.length === 0 ? (
+          <p className="text-gray-400">No shows available for this movie yet.</p>
+        ) : (() => {
+          const filteredTheatres = selectedCity
+            ? show.theatres.filter(t => t.city?.toLowerCase() === selectedCity.toLowerCase())
+            : show.theatres;
+
+          return filteredTheatres.length === 0 ? (
+            <div>
+              <p className="text-gray-400">No shows in <span className="text-white font-medium">{selectedCity}</span> for this movie.</p>
+              <button onClick={() => setShowCitySelector(true)} className="text-primary text-sm mt-2 underline">
+                Try a different city
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {filteredTheatres.map((theatre) => (
+                <button
+                  key={theatre.theatreId}
+                  onClick={() => {
+                    setSelectedTheatre(theatre);
+                    setTimeout(() => {
+                      dateRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 50);
+                  }}
+                  className={`flex flex-col items-start px-5 py-3 rounded-xl border text-sm transition active:scale-95 ${selectedTheatre?.theatreId === theatre.theatreId
+                    ? "border-primary bg-primary/15 text-white"
+                    : "border-gray-600 hover:border-primary/60 text-gray-300"
+                    }`}
+                >
+                  <span className="font-semibold text-base">{theatre.name}</span>
+                  <span className="flex items-center gap-1 text-gray-400 text-xs mt-0.5">
+                    <MapPinIcon className="w-3 h-3" />
+                    {theatre.city}
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* ================= DATE SELECT ================= */}
-      <DateSelect dateTime={show.dateTime} id={id} />
+      <div ref={dateRef}>
+        {(() => {
+          // Only show DateSelect if selectedTheatre is valid for the current city
+          const filteredTheatres = selectedCity
+            ? show.theatres.filter(t => t.city.toLowerCase() === selectedCity.toLowerCase())
+            : show.theatres;
+          const isValidSelection = selectedTheatre &&
+            filteredTheatres.some(t => t.theatreId === selectedTheatre.theatreId);
+          return isValidSelection
+            ? <DateSelect dateTime={selectedTheatre.dateTime} id={id} />
+            : null;
+        })()}
+      </div>
 
       {/* ================= RECOMMENDED ================= */}
       <p className="text-lg font-medium mt-20 mb-8">
@@ -195,7 +286,10 @@ const MovieDetails = () => {
       </p>
 
       <div className="flex flex-wrap max-sm:justify-center gap-8">
-        {shows.slice(0, 4).map((movie, index) => (
+        {(selectedCity
+          ? shows.filter(show => show.theatres && show.theatres.some(t => t.city?.toLowerCase() === selectedCity.toLowerCase()))
+          : shows
+        ).slice(0, 4).map((movie, index) => (
           <MovieCard key={index} movie={movie} />
         ))}
       </div>

@@ -155,17 +155,17 @@ export const getFeaturedTrailers = async (req, res) => {
   }
 };
 
-// �🎟️ Add Show (Admin)
+// 🎟️ Add Show (Admin)
 export const addShow = async (req, res) => {
   try {
-    const { movieID, showInput, showPrice } = req.body;
+    const { movieID, showInput, showPrice, theatreId } = req.body;
 
     console.log("ADD SHOW REQ BODY:", JSON.stringify(req.body, null, 2));
 
-    if (!movieID || !showInput || !showPrice) {
+    if (!movieID || !showInput || !showPrice || !theatreId) {
       return res.status(400).json({
         success: false,
-        message: "movieID, showInput and showPrice are required",
+        message: "movieID, showInput, showPrice and theatreId are required",
       });
     }
 
@@ -209,13 +209,14 @@ export const addShow = async (req, res) => {
       });
     }
 
-    // 🔹 Create shows
+    // 🔹 Create shows linked to the selected theatre
     const showsToCreate = [];
 
     showInput.forEach((show) => {
       show.time.forEach((time) => {
         showsToCreate.push({
           movie: movie._id,
+          theatre: theatreId,
           showDateTime: new Date(`${show.date}T${time}`),
           showPrice,
         });
@@ -248,17 +249,37 @@ export const getShows = async (req, res) => {
       showDateTime: { $gte: new Date() }
     })
       .populate("movie")
+      .populate("theatre")
       .sort({ showDateTime: 1 });
 
-    // filter unique shows by movie ID
+    // Build unique movies map, collecting theatres per movie
     const uniqueMovies = {};
     shows.forEach(show => {
-      if (show.movie && !uniqueMovies[show.movie._id]) {
-        uniqueMovies[show.movie._id] = show.movie;
+      if (!show.movie) return;
+      const movieId = show.movie._id.toString();
+
+      if (!uniqueMovies[movieId]) {
+        uniqueMovies[movieId] = {
+          ...show.movie.toObject(),
+          theatres: [],
+          _theatreIds: new Set(),
+        };
+      }
+
+      if (show.theatre && !uniqueMovies[movieId]._theatreIds.has(show.theatre._id.toString())) {
+        uniqueMovies[movieId]._theatreIds.add(show.theatre._id.toString());
+        uniqueMovies[movieId].theatres.push({
+          _id: show.theatre._id,
+          name: show.theatre.name,
+          city: show.theatre.city,
+        });
       }
     });
 
-    res.json({ success: true, shows: Object.values(uniqueMovies) });
+    // Clean up the helper Set before sending
+    const result = Object.values(uniqueMovies).map(({ _theatreIds, ...rest }) => rest);
+
+    res.json({ success: true, shows: result });
   } catch (error) {
     console.error(error);
     res.json({ success: false, message: error.message });
@@ -306,34 +327,50 @@ export const getMovieTrailers = async (req, res) => {
   }
 };
 
-// API to get a single show from the database
+// API to get a single show from the database — grouped by theatre then by date
 export const getShow = async (req, res) => {
   try {
     const { movieId } = req.params;
 
-    // get all upcoming shows for the movie
+    // get all upcoming shows for the movie, populate theatre
     const shows = await Show.find({
       movie: movieId,
       showDateTime: { $gte: new Date() }
-    });
+    }).populate("theatre");
 
     const movie = await Movie.findById(movieId);
-    const dateTime = {};
+
+    // Group shows by theatre, then by date
+    const theatreMap = {};
 
     shows.forEach((show) => {
+      if (!show.theatre) return;
+      const tId = show.theatre._id.toString();
       const date = show.showDateTime.toISOString().split("T")[0];
 
-      if (!dateTime[date]) {
-        dateTime[date] = [];
+      if (!theatreMap[tId]) {
+        theatreMap[tId] = {
+          theatreId: tId,
+          name: show.theatre.name,
+          city: show.theatre.city,
+          address: show.theatre.address,
+          dateTime: {},
+        };
       }
 
-      dateTime[date].push({
+      if (!theatreMap[tId].dateTime[date]) {
+        theatreMap[tId].dateTime[date] = [];
+      }
+
+      theatreMap[tId].dateTime[date].push({
         time: show.showDateTime,
-        showId: show._id
+        showId: show._id,
       });
     });
 
-    res.json({ success: true, movie, dateTime });
+    const theatres = Object.values(theatreMap);
+
+    res.json({ success: true, movie, theatres });
   } catch (error) {
     console.error(error);
     res.json({ success: false, message: error.message });

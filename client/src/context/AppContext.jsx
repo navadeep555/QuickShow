@@ -11,10 +11,22 @@ export const AppContext = createContext();
 export const AppProvider = ({ children }) => {
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminLoading, setAdminLoading] = useState(true); // 🔥 Add loading state
+  const [adminLoading, setAdminLoading] = useState(true);
   const [shows, setShows] = useState([]);
   const [favoriteMovies, setFavoriteMovies] = useState([]);
+  const [selectedCity, setSelectedCityState] = useState(() => localStorage.getItem("cinesnap_city") || null);
+  const [showCitySelector, setShowCitySelector] = useState(() => !localStorage.getItem("cinesnap_city"));
   const image_base_url = import.meta.env.VITE_TMDB_IMAGE_BASE_URL;
+
+  const setSelectedCity = (city) => {
+    setSelectedCityState(city);
+    if (city) {
+      localStorage.setItem("cinesnap_city", city);
+      setShowCitySelector(false);
+    } else {
+      localStorage.removeItem("cinesnap_city");
+    }
+  };
 
   const { user, isLoaded } = useUser();
   const { getToken } = useAuth();
@@ -147,6 +159,10 @@ export const AppProvider = ({ children }) => {
     fetchFavoriteMovies,
     adminLoading,
     image_base_url,
+    selectedCity,
+    setSelectedCity,
+    showCitySelector,
+    setShowCitySelector,
   };
 
   return (

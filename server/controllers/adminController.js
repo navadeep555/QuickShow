@@ -70,12 +70,13 @@ export const getAllShows = async (req, res) => {
 export const getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({})
-      .populate({
-        path: "user",
-      })
+      .populate({ path: "user" })
       .populate({
         path: "show",
-        populate: { path: "movie" },
+        populate: [
+          { path: "movie" },
+          { path: "theatre" },
+        ],
       })
       .sort({ createdAt: -1 });
 

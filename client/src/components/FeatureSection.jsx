@@ -7,7 +7,11 @@ import { AppContext } from '../context/AppContext'
 
 const FeaturedSection = () => {
   const navigate = useNavigate()
-  const { shows } = useContext(AppContext)
+  const { shows, selectedCity } = useContext(AppContext)
+
+  const filteredShows = selectedCity
+    ? shows.filter(show => show.theatres && show.theatres.some(t => t.city?.toLowerCase() === selectedCity.toLowerCase()))
+    : shows;
 
   return (
     <div className="px-6 md:px-16 lg:px-24 xl:px-44 overflow-hidden relative">
@@ -29,7 +33,7 @@ const FeaturedSection = () => {
       </div>
 
       <div className='flex flex-wrap max-sm:justify-centerr gap-8 mt-8'>
-        {shows.slice(0, 4).map((show) => (<MovieCard key={show._id} movie={show} />))}
+        {filteredShows.slice(0, 4).map((show) => (<MovieCard key={show._id} movie={show} />))}
       </div>
 
       <div className="flex justify-center mt-20">
