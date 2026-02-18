@@ -15,7 +15,7 @@ export const AppProvider = ({ children }) => {
   const [shows, setShows] = useState([]);
   const [favoriteMovies, setFavoriteMovies] = useState([]);
   const [selectedCity, setSelectedCityState] = useState(() => localStorage.getItem("cinesnap_city") || null);
-  const [showCitySelector, setShowCitySelector] = useState(() => !localStorage.getItem("cinesnap_city"));
+  const [showCitySelector, setShowCitySelector] = useState(false);
   const image_base_url = import.meta.env.VITE_TMDB_IMAGE_BASE_URL;
 
   const setSelectedCity = (city) => {
