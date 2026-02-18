@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import BlurCircle from "../components/BlurCircle";
-import { StarIcon, PlayCircleIcon, Heart } from "lucide-react";
+import { StarIcon, PlayCircleIcon, Heart, X, Loader2 } from "lucide-react";
 import timeFormat from "../lib/timeFormat";
 import DateSelect from "../components/DateSelect";
 import MovieCard from "../components/MovieCard";
@@ -14,6 +14,12 @@ const MovieDetails = () => {
   const { id } = useParams();
   const { axios, shows, getToken, user, fetchFavoriteMovies, favoriteMovies, image_base_url } = useContext(AppContext);
   const [show, setShow] = useState(null);
+
+  // Trailer modal state
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [trailers, setTrailers] = useState([]);
+  const [trailerIndex, setTrailerIndex] = useState(0);
+  const [loadingTrailers, setLoadingTrailers] = useState(false);
 
   const getShow = async () => {
     try {
@@ -33,6 +39,31 @@ const MovieDetails = () => {
       toast.error("Failed to fetch show details");
     }
   };
+
+  const handleWatchTrailer = async () => {
+    setLoadingTrailers(true);
+    try {
+      const { data } = await axios.get(`/api/shows/trailers/${show.movie._id}`);
+      if (data.success && data.trailers.length > 0) {
+        setTrailers(data.trailers);
+        setTrailerIndex(0);
+        setShowTrailer(true);
+      } else {
+        toast.error("No trailers available for this movie");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load trailers");
+    } finally {
+      setLoadingTrailers(false);
+    }
+  };
+
+  const closeTrailer = () => {
+    setShowTrailer(false);
+    setTrailers([]);
+  };
+
   const handleFavorite = async () => {
     try {
       if (!user) {
@@ -52,6 +83,7 @@ const MovieDetails = () => {
       toast.error("Failed to update favorite status");
     }
   };
+
   useEffect(() => {
     getShow();
     window.scrollTo(0, 0);
@@ -74,7 +106,9 @@ const MovieDetails = () => {
         <div className="relative flex flex-col gap-4">
           <BlurCircle top="-100px" left="-100px" />
 
-          <p className="text-primary font-medium">ENGLISH</p>
+          <p className="text-primary font-medium uppercase">
+            {new Intl.DisplayNames(["en"], { type: "language" }).of(show.movie.original_language) || "ENGLISH"}
+          </p>
 
           <h1 className="text-4xl font-semibold max-w-2xl">
             {show.movie.title}
@@ -100,9 +134,16 @@ const MovieDetails = () => {
 
           {/* ACTION BUTTONS */}
           <div className="flex flex-wrap gap-4 mt-4">
-            <button className="flex items-center gap-2 px-7 py-3 text-sm bg-gray-800 hover:bg-gray-900 rounded-md transition active:scale-95">
-              <PlayCircleIcon className="w-5 h-5" />
-              Watch Trailer
+            <button
+              onClick={handleWatchTrailer}
+              disabled={loadingTrailers}
+              className="flex items-center gap-2 px-7 py-3 text-sm bg-gray-800 hover:bg-gray-900 rounded-md transition active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loadingTrailers
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : <PlayCircleIcon className="w-5 h-5" />
+              }
+              {loadingTrailers ? "Loading..." : "Watch Trailer"}
             </button>
 
             <a
@@ -171,6 +212,70 @@ const MovieDetails = () => {
           Show More
         </button>
       </div>
+
+      {/* ================= TRAILER MODAL ================= */}
+      {showTrailer && trailers.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-16 bg-black/80 backdrop-blur-sm"
+          onClick={closeTrailer}
+        >
+          <div
+            className="relative w-full max-w-4xl mx-auto px-4 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={closeTrailer}
+              className="absolute -top-10 right-0 text-white hover:text-primary transition"
+            >
+              <X className="w-7 h-7" />
+            </button>
+
+            {/* Video player */}
+            <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
+              <iframe
+                key={trailerIndex}
+                src={`https://www.youtube.com/embed/${trailers[trailerIndex].key}?autoplay=1`}
+                title={trailers[trailerIndex].name}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+
+            {/* Trailer name */}
+            <p className="text-center text-sm text-gray-300 mt-3">
+              {trailers[trailerIndex].name}
+            </p>
+
+            {/* Trailer thumbnails — only show if more than 1 */}
+            {trailers.length > 1 && (
+              <div className="flex gap-3 mt-4 justify-center flex-wrap">
+                {trailers.map((trailer, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setTrailerIndex(index)}
+                    className={`relative rounded-lg overflow-hidden transition ${trailerIndex === index
+                      ? "ring-2 ring-primary"
+                      : "opacity-60 hover:opacity-100"
+                      }`}
+                  >
+                    <img
+                      src={`https://img.youtube.com/vi/${trailer.key}/mqdefault.jpg`}
+                      alt={trailer.name}
+                      className="w-32 h-20 object-cover"
+                    />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
+                      {trailer.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   ) : (
     <Loading />

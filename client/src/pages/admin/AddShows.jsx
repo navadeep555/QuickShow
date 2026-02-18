@@ -8,7 +8,7 @@ import { toast } from "react-hot-toast";
 const AddShows = () => {
   const { axios, getToken, user, image_base_url } = useAppContext();
   const currency = import.meta.env.VITE_CURRENCY;
-  const [nowPlayingMovies, setNowPlayingMovies] = useState([]);
+  const [industries, setIndustries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [showPrice, setShowPrice] = useState("");
@@ -28,7 +28,7 @@ const AddShows = () => {
       });
 
       if (data.success) {
-        setNowPlayingMovies(data.movies);
+        setIndustries(data.industries);
       }
 
     } catch (error) {
@@ -139,38 +139,43 @@ const AddShows = () => {
 
       <p className="mt-10 text-lg font-medium">Now Playing Movies</p>
 
-      <div className="overflow-x-auto pb-4">
-        <div className="flex flex-wrap gap-4 mt-4 w-max">
-          {nowPlayingMovies.map((movie) => (
-            <div
-              key={movie.id}
-              className={`relative max-w-40 cursor-pointer
-              hover:-translate-y-1 transition
-              ${selectedMovie === movie.id ? "ring-2 ring-primary" : ""}`}
-              onClick={() => setSelectedMovie(movie.id)}
-            >
-              <img
-                src={image_base_url + movie.poster_path}
-                alt={movie.title}
-                className="rounded-lg brightness-90"
-              />
+      {industries.map((industry) => (
+        <div key={industry.name} className="mt-8">
+          {/* Industry label */}
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-primary font-semibold text-base">{industry.name}</span>
+            <div className="flex-1 h-px bg-gray-700" />
+          </div>
 
-              {selectedMovie === movie.id && (
-                <div className="absolute top-2 right-2 bg-primary h-6 w-6 rounded-full flex items-center justify-center">
-                  <CheckIcon className="w-4 h-4 text-white" />
+          <div className="overflow-x-auto pb-4 no-scrollbar">
+            <div className="flex gap-4 w-max">
+              {industry.movies.map((movie) => (
+                <div
+                  key={movie.id}
+                  className={`relative w-36 cursor-pointer hover:-translate-y-1 transition ${selectedMovie === movie.id ? "ring-2 ring-primary rounded-lg" : ""
+                    }`}
+                  onClick={() => setSelectedMovie(movie.id)}
+                >
+                  <img
+                    src={image_base_url + movie.poster_path}
+                    alt={movie.title}
+                    className="rounded-lg brightness-90 w-full"
+                  />
+
+                  {selectedMovie === movie.id && (
+                    <div className="absolute top-2 right-2 bg-primary h-6 w-6 rounded-full flex items-center justify-center">
+                      <CheckIcon className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+
+                  <p className="font-medium p-2 truncate text-sm">{movie.title}</p>
+                  <p className="text-xs text-gray-400 px-2 pb-2">{movie.release_date}</p>
                 </div>
-              )}
-
-              <p className="font-medium p-2 truncate">
-                {movie.title}
-              </p>
-              <p className="text-sm text-gray-400 px-2 pb-2">
-                {movie.release_date}
-              </p>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      ))}
 
       <div className="mt-8">
         <label className="block text-sm mb-2">Show Price</label>
