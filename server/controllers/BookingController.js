@@ -2,7 +2,8 @@ import Show from "../models/Show.js";
 import Booking from "../models/Booking.js";
 import Stripe from "stripe";
 import { inngest } from "../inngest/index.js";
-import { getAuth } from "@clerk/express";
+import { getAuth, clerkClient } from "@clerk/express";
+import User from "../models/User.js";
 // Function to check availability of selected seats
 const checkSeatsAvailability = async (showId, selectedSeats) => {
   const bookings = await Booking.find({ show: showId });
@@ -22,6 +23,24 @@ export const createBooking = async (req, res) => {
         success: false,
         message: "Unauthorized - Please login to book tickets",
       });
+    }
+
+    // Lazy Sync: Ensure user exists in MongoDB
+    let user = await User.findById(userId);
+    if (!user) {
+      try {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        user = await User.create({
+          _id: clerkUser.id,
+          name: `${clerkUser.firstName} ${clerkUser.lastName}`.trim(),
+          email: clerkUser.emailAddresses[0].emailAddress,
+          image: clerkUser.imageUrl,
+        });
+        console.log("Lazy synced user:", user._id);
+      } catch (error) {
+        console.error("Error lazy syncing user:", error.message);
+        // Continue but might fail populated queries
+      }
     }
 
     // Check availability

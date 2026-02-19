@@ -11,12 +11,17 @@ import adminRouter from './routes/adminRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import theatreRouter from './routes/theatreRoutes.js';
 import { stripeWebhooks } from './controllers/stripeWebhooks.js';
+import { clerkWebhooks } from './controllers/clerkWebhooks.js';
 const app = express();
 const port = 3000;
 await connectDB()
 
 //stripe webhook route
+//stripe webhook route
 app.use("/api/stripe", express.raw({ type: "application/json" }), stripeWebhooks);
+
+//clerk webhook route
+app.use('/api/webhooks/clerk', express.json(), clerkWebhooks)
 
 //Middlewares
 app.use(express.json());
