@@ -29,6 +29,7 @@ export const addTheatre = async (req, res) => {
 export const getAllTheatres = async (req, res) => {
     try {
         const theatres = await Theatre.find({ isActive: true }).sort({ city: 1, name: 1 });
+        res.setHeader('Cache-Control', 'no-store');
         res.json({ success: true, theatres });
     } catch (error) {
         console.error("GET THEATRES ERROR:", error);
@@ -40,6 +41,7 @@ export const getAllTheatres = async (req, res) => {
 export const getAllTheatresAdmin = async (req, res) => {
     try {
         const theatres = await Theatre.find({}).sort({ city: 1, name: 1 });
+        res.setHeader('Cache-Control', 'no-store');
         res.json({ success: true, theatres });
     } catch (error) {
         console.error("GET THEATRES ADMIN ERROR:", error);

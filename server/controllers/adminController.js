@@ -57,6 +57,7 @@ export const getAllShows = async (req, res) => {
       })
     );
 
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, shows: showsWithSeats });
 
   } catch (error) {
@@ -80,6 +81,7 @@ export const getAllBookings = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, bookings });
 
   } catch (error) {

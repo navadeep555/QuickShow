@@ -33,6 +33,17 @@ app.use(clerkMiddleware())
 app.get('/', (req, res) => {
     res.send('Server is running');
 });
+
+// Debug endpoint to check DB connection
+app.get('/api/health', (req, res) => {
+    try {
+        const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+        const dbName = mongoose.connection.name || 'Unknown';
+        res.json({ success: true, dbStatus, dbName });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/shows", showRouter);
 app.use("/api/bookings", bookingRouter);

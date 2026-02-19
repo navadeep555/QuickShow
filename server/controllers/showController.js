@@ -279,6 +279,7 @@ export const getShows = async (req, res) => {
     // Clean up the helper Set before sending
     const result = Object.values(uniqueMovies).map(({ _theatreIds, ...rest }) => rest);
 
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, shows: result });
   } catch (error) {
     console.error(error);
