@@ -4,6 +4,7 @@ import Booking from "../models/Booking.js";
 import Show from "../models/Show.js";
 import Movie from "../models/Movie.js";
 import sendEmail from "../configs/nodeMailer.js";
+import { clerkClient } from "@clerk/express";
 
 export const inngest = new Inngest({
   id: "movie-ticket-booking",
@@ -97,8 +98,34 @@ const sendBookingConfirmationEmail = inngest.createFunction(
 
     if (!booking || !booking.show) return;
 
-    const recipientEmail = booking.user?.email;
-    const recipientName = booking.user?.name || "Customer";
+    // If user not in MongoDB, fallback to Clerk
+    let recipientEmail = booking.user?.email;
+    let recipientName = booking.user?.name || "Customer";
+    if (!recipientEmail && booking.userId) {
+      try {
+        const clerkUser = await clerkClient.users.getUser(booking.userId);
+        recipientEmail = clerkUser.emailAddresses[0]?.emailAddress;
+        recipientName = `${clerkUser.firstName} ${clerkUser.lastName}`.trim() || "Customer";
+      } catch (e) {
+        console.error("Could not fetch user from Clerk:", e.message);
+      }
+    }
+
+    // Also try using the user field as a string ID (Clerk ID stored as string)
+    if (!recipientEmail && typeof booking.user === "string") {
+      try {
+        const clerkUser = await clerkClient.users.getUser(booking.user);
+        recipientEmail = clerkUser.emailAddresses[0]?.emailAddress;
+        recipientName = `${clerkUser.firstName} ${clerkUser.lastName}`.trim() || "Customer";
+      } catch (e) {
+        console.error("Could not fetch user from Clerk (string id):", e.message);
+      }
+    }
+
+    if (!recipientEmail) {
+      console.error("No recipient email found for booking", bookingId);
+      return;
+    }
     const movieTitle = booking.show.movie?.title || "Unknown Movie";
     const theatreName = booking.show.theatre?.name || "";
     const theatreAddress = booking.show.theatre?.address || "";
