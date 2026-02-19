@@ -310,6 +310,94 @@ const sendNewShowNotifications = inngest.createFunction(
 );
 
 
+
+/* ================= BOOKING CANCELLATION EMAIL ================= */
+const sendCancellationEmail = inngest.createFunction(
+  { id: "send-cancellation-email" },
+  { event: "app/booking.cancelled" },
+  async ({ event }) => {
+    const { userId, movieTitle, theatreName, theatreCity, showDateTime, amount, seats, refunded } = event.data;
+
+    let recipientEmail = null;
+    let recipientName = "Customer";
+
+    // Try to get user from MongoDB first
+    const dbUser = await User.findById(userId);
+    if (dbUser) {
+      recipientEmail = dbUser.email;
+      recipientName = dbUser.name || "Customer";
+    } else {
+      // Fallback to Clerk
+      try {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        recipientEmail = clerkUser.emailAddresses[0]?.emailAddress;
+        recipientName = `${clerkUser.firstName} ${clerkUser.lastName}`.trim() || "Customer";
+      } catch (e) {
+        console.error("Could not fetch user from Clerk for cancellation email:", e.message);
+      }
+    }
+
+    if (!recipientEmail) return;
+
+    const formattedDate = showDateTime
+      ? new Date(showDateTime).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "long", year: "numeric" })
+      : "";
+    const formattedTime = showDateTime
+      ? new Date(showDateTime).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })
+      : "";
+    const venue = [theatreName, theatreCity].filter(Boolean).join(", ");
+
+    await sendEmail({
+      to: recipientEmail,
+      subject: `❌ Booking Cancelled - ${movieTitle}`,
+      body: `
+        <div style="font-family: Arial; line-height:1.6;">
+          <h2 style="color:#e11d48;">Booking Cancelled</h2>
+          <p>Hi <strong>${recipientName}</strong>,</p>
+          <p>Your booking for <strong>${movieTitle}</strong> has been cancelled.</p>
+          <div style="background:#f4f4f4; padding:15px; border-radius:8px;">
+            ${formattedDate ? `<p><strong>📅 Show Date:</strong> ${formattedDate}</p>` : ""}
+            ${formattedTime ? `<p><strong>⏰ Show Time:</strong> ${formattedTime}</p>` : ""}
+            ${venue ? `<p><strong>🎭 Theatre:</strong> ${venue}</p>` : ""}
+            <p><strong>🎟️ Seats:</strong> ${seats?.join(", ") || ""}</p>
+            <p><strong>💰 Amount:</strong> ₹${amount}</p>
+          </div>
+          ${refunded
+          ? `<p style="color:green;"><strong>✅ Refund of ₹${amount} has been initiated.</strong> It will reflect in 5–7 business days.</p>`
+          : `<p>No refund applicable for this cancellation.</p>`
+        }
+          <p>We hope to see you again. 🍿</p>
+        </div>
+      `,
+    });
+
+    // Notify admin
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      await sendEmail({
+        to: adminEmail,
+        subject: `⚠️ Booking Cancelled by ${recipientName} - ${movieTitle}`,
+        body: `
+          <div style="font-family: Arial; line-height:1.6;">
+            <h2 style="color:#e11d48;">Booking Cancellation Alert</h2>
+            <p>A booking has been cancelled. Details:</p>
+            <div style="background:#f4f4f4; padding:15px; border-radius:8px;">
+              <p><strong>👤 User:</strong> ${recipientName} (${recipientEmail})</p>
+              <p><strong>🎬 Movie:</strong> ${movieTitle}</p>
+              ${formattedDate ? `<p><strong>📅 Show Date:</strong> ${formattedDate}</p>` : ""}
+              ${formattedTime ? `<p><strong>⏰ Show Time:</strong> ${formattedTime}</p>` : ""}
+              ${venue ? `<p><strong>🎭 Theatre:</strong> ${venue}</p>` : ""}
+              <p><strong>🎟️ Seats:</strong> ${seats?.join(", ") || ""}</p>
+              <p><strong>💰 Amount:</strong> ₹${amount}</p>
+              <p><strong>Refund Status:</strong> ${refunded ? "✅ Refunded" : "❌ No refund"}</p>
+            </div>
+          </div>
+        `,
+      });
+    }
+  }
+);
+
 /* ================= EXPORT ================= */
 export const functions = [
   syncUserCreation,
@@ -318,5 +406,6 @@ export const functions = [
   releaseSeatsAndDeleteBooking,
   sendBookingConfirmationEmail,
   sendShowReminders,
-  sendNewShowNotifications
+  sendNewShowNotifications,
+  sendCancellationEmail,
 ];

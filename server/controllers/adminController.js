@@ -12,7 +12,7 @@ export const isAdmin = async (req, res) => {
 // API to get dashboard data
 export const getDashboardData = async (req, res) => {
   try {
-    const bookings = await Booking.find({ isPaid: true });
+    const bookings = await Booking.find({ isPaid: true, isCancelled: { $ne: true } });
 
     const activeShows = await Show.find({
       showDateTime: { $gte: new Date() },
@@ -30,6 +30,7 @@ export const getDashboardData = async (req, res) => {
       totalUser,
     };
 
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, dashboardData });
 
   } catch (error) {
@@ -51,9 +52,10 @@ export const getAllShows = async (req, res) => {
 
     const showsWithSeats = await Promise.all(
       shows.map(async (show) => {
-        const bookings = await Booking.find({ show: show._id });
+        const bookings = await Booking.find({ show: show._id, isCancelled: { $ne: true } });
         const occupiedSeats = bookings.flatMap((booking) => booking.bookedSeats);
-        return { ...show.toObject(), occupiedSeats };
+        const cancelledCount = await Booking.countDocuments({ show: show._id, isCancelled: true });
+        return { ...show.toObject(), occupiedSeats, cancelledBookings: cancelledCount };
       })
     );
 

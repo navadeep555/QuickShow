@@ -135,7 +135,7 @@ const SeatLayout = () => {
           ${isSelected
             ? "bg-primary text-white"
             : isOccupied
-              ? "bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed border-gray-300"
+              ? "bg-primary/20 text-white/30 cursor-not-allowed border-primary/20 line-through"
               : "border-primary/60 hover:bg-primary/20 cursor-pointer"
           }`}
       >

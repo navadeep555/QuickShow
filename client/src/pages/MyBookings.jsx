@@ -15,6 +15,7 @@ const MyBookings = () => {
   const { axios, getToken, user, image_base_url, selectedCity } = useContext(AppContext);
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
 
   const getMyBookings = async () => {
     try {
@@ -45,6 +46,27 @@ const MyBookings = () => {
       console.log(error);
     } finally {
       getMyBookings();
+    }
+  };
+
+  const handleCancel = async (bookingId) => {
+    if (!window.confirm("Are you sure you want to cancel this booking? A refund will be initiated if payment was made.")) return;
+    setCancellingId(bookingId);
+    try {
+      const { data } = await axios.delete(`/api/bookings/cancel/${bookingId}`, {
+        headers: { Authorization: `Bearer ${await getToken()}` }
+      });
+      if (data.success) {
+        alert(data.message);
+        getMyBookings();
+      } else {
+        alert(data.message || "Failed to cancel booking");
+      }
+    } catch (error) {
+      console.log(error);
+      alert("Error cancelling booking");
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -130,7 +152,12 @@ const MyBookings = () => {
                         {currency}{item.amount}
                       </p>
 
-                      {!item.isPaid ? (
+                      {item.isCancelled ? (
+                        <p className="bg-red-500/10 text-red-400 border border-red-500/20
+                                     px-4 py-1 mb-3 text-xs rounded-full font-semibold uppercase tracking-wider">
+                          Cancelled
+                        </p>
+                      ) : !item.isPaid ? (
                         <Link to={item.paymentLink}
                           className="bg-primary px-4 py-1.5 mb-3
                                      text-sm rounded-full font-medium
@@ -159,6 +186,24 @@ const MyBookings = () => {
                         </span>{" "}
                         {item.bookedSeats.join(", ")}
                       </p>
+
+                      {item.isCancelled ? (
+                        item.refundAmount > 0 && (
+                          <p className="mt-2 text-xs text-green-400">
+                            ✅ Refund of {currency}{item.refundAmount} initiated
+                          </p>
+                        )
+                      ) : item.isPaid && (
+                        <button
+                          onClick={() => handleCancel(item._id)}
+                          disabled={cancellingId === item._id}
+                          className="mt-3 px-4 py-1.5 text-xs rounded-full border border-red-500/40
+                                     text-red-400 hover:bg-red-500/10 transition cursor-pointer
+                                     disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancellingId === item._id ? "Cancelling..." : "Cancel Booking"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

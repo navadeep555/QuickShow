@@ -6,7 +6,7 @@ import { getAuth, clerkClient } from "@clerk/express";
 import User from "../models/User.js";
 // Function to check availability of selected seats
 const checkSeatsAvailability = async (showId, selectedSeats) => {
-  const bookings = await Booking.find({ show: showId });
+  const bookings = await Booking.find({ show: showId, isCancelled: { $ne: true } });
   const occupiedSeats = bookings.flatMap((b) => b.bookedSeats);
   const isAnySeatTaken = selectedSeats.some((seat) => occupiedSeats.includes(seat));
   return !isAnySeatTaken;
@@ -124,7 +124,7 @@ export const getOccupiedSeats = async (req, res) => {
       });
     }
 
-    const bookings = await Booking.find({ show: showId });
+    const bookings = await Booking.find({ show: showId, isCancelled: { $ne: true } });
     const occupiedSeats = bookings.flatMap((b) => b.bookedSeats);
 
     res.json({
@@ -176,6 +176,7 @@ export const verifyPayment = async (req, res) => {
         if (booking && !booking.isPaid) {
           await Booking.findByIdAndUpdate(bookingId, {
             isPaid: true,
+            stripeSessionId: sessionId,
             paymentLink: "",
           });
 
@@ -212,3 +213,71 @@ export const verifyPayment = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+export const cancelBooking = async (req, res) => {
+  try {
+    const { userId } = getAuth(req);
+    const { bookingId } = req.params;
+
+    const booking = await Booking.findById(bookingId).populate({
+      path: "show",
+      populate: [{ path: "movie" }, { path: "theatre" }],
+    }).populate("user");
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    if (booking.user?._id?.toString() !== userId && booking.user !== userId) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!booking.isPaid) {
+      // Just mark unpaid booking as cancelled — no refund needed
+      await Booking.findByIdAndUpdate(bookingId, { isCancelled: true, cancelledAt: new Date() });
+      return res.json({ success: true, message: "Booking cancelled" });
+    }
+
+    // Issue Stripe refund using stored session ID
+    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+    let refunded = false;
+
+    if (booking.stripeSessionId) {
+      const session = await stripeInstance.checkout.sessions.retrieve(booking.stripeSessionId);
+      if (session.payment_intent) {
+        await stripeInstance.refunds.create({ payment_intent: session.payment_intent });
+        refunded = true;
+      }
+    }
+
+    // Soft-delete: mark as cancelled in DB (keeps history, releases seats)
+    await Booking.findByIdAndUpdate(bookingId, {
+      isCancelled: true,
+      cancelledAt: new Date(),
+      refundAmount: refunded ? booking.amount : 0,
+    });
+
+    // Send cancellation email via Inngest
+    await inngest.send({
+      name: "app/booking.cancelled",
+      data: {
+        userId: booking.user?._id || booking.user,
+        bookingId: bookingId,
+        movieTitle: booking.show?.movie?.title || "Unknown Movie",
+        theatreName: booking.show?.theatre?.name || "",
+        theatreCity: booking.show?.theatre?.city || "",
+        showDateTime: booking.show?.showDateTime,
+        amount: booking.amount,
+        seats: booking.bookedSeats,
+        refunded,
+      },
+    });
+
+    res.json({ success: true, message: refunded ? "Booking cancelled and refund initiated" : "Booking cancelled" });
+
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+

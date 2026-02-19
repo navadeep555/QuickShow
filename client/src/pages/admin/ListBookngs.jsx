@@ -59,7 +59,7 @@ const ListBookings = () => {
               {bookings.map((item, index) => (
                 <tr
                   key={index}
-                  className="border-b border-primary/20 bg-primary/5 even:bg-primary/10"
+                  className={`border-b border-primary/20 ${item.isCancelled ? "opacity-60" : "bg-primary/5 even:bg-primary/10"}`}
                 >
                   {/* User — Clerk stores userId as string, not a populated object */}
                   <td className="p-2 pl-5 text-gray-300 text-xs">
@@ -89,11 +89,16 @@ const ListBookings = () => {
                   </td>
 
                   <td className="p-2">
-                    {currency} {item.amount}
+                    <p>{currency} {item.amount}</p>
+                    {item.isCancelled && item.refundAmount > 0 && (
+                      <p className="text-xs text-green-400">Refunded: {currency}{item.refundAmount}</p>
+                    )}
                   </td>
 
                   <td className="p-2">
-                    {item.isPaid ? (
+                    {item.isCancelled ? (
+                      <span className="text-red-400 font-medium">Cancelled</span>
+                    ) : item.isPaid ? (
                       <span className="text-green-400 font-medium">Paid</span>
                     ) : (
                       <span className="text-yellow-400 font-medium">Pending</span>
