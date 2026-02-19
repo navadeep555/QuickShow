@@ -88,7 +88,10 @@ const sendBookingConfirmationEmail = inngest.createFunction(
     const booking = await Booking.findById(bookingId)
       .populate({
         path: "show",
-        populate: { path: "movie" },
+        populate: [
+          { path: "movie" },
+          { path: "theatre" },
+        ],
       })
       .populate("user");
 
@@ -97,6 +100,10 @@ const sendBookingConfirmationEmail = inngest.createFunction(
     const recipientEmail = booking.user?.email;
     const recipientName = booking.user?.name || "Customer";
     const movieTitle = booking.show.movie?.title || "Unknown Movie";
+    const theatreName = booking.show.theatre?.name || "";
+    const theatreAddress = booking.show.theatre?.address || "";
+    const theatreCity = booking.show.theatre?.city || "";
+    const theatreInfo = [theatreName, theatreAddress, theatreCity].filter(Boolean).join(", ");
 
     const showDateObj = new Date(booking.show.showDateTime);
 
@@ -127,6 +134,7 @@ const sendBookingConfirmationEmail = inngest.createFunction(
           <div style="background:#f4f4f4; padding:15px; border-radius:8px;">
             <p><strong>📅 Show Date:</strong> ${formattedDate}</p>
             <p><strong>⏰ Show Time:</strong> ${formattedTime}</p>
+            ${theatreInfo ? `<p><strong>🎭 Theatre:</strong> ${theatreInfo}</p>` : ""}
           </div>
 
           <p>Please arrive 15 minutes early.</p>
