@@ -257,9 +257,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ---
 
 <div align="center">
-
-Made with ❤️ by [Navadeep](https://github.com/navadeep555)
-
-⭐ If you found this project helpful, please give it a star!
-
-</div>
